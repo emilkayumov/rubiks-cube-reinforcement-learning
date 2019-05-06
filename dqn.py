@@ -2,6 +2,7 @@ import random
 from collections import namedtuple
 
 import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
@@ -26,14 +27,17 @@ class DQN(nn.Module):
         x = F.relu(self.layer3(x))
         return self.head(x)
 
-    def get_action_probabilities(self, observation, tau=1):
-        return Categorical(logits=self.forward(observation * tau).detach())
+    def get_action_probabilities(self, observation, temperature=1):
+        with torch.no_grad():
+            return Categorical(
+                logits=self.forward(observation) * temperature)
 
     def sample_action(self, observation):
         return self.get_action_probabilities(observation).sample()
 
     def select_action(self, observation):
-        return self.forward(observation).detach().max(0)[1]
+        with torch.no_grad():
+            return self.forward(observation).max(0)[1]
 
 
 class ReplayMemory:
@@ -68,6 +72,10 @@ class ValueNetwork(nn.Module):
         x = F.relu(self.layer2(x))
         x = F.relu(self.layer3(x))
         return self.head(x)
+
+    def get_value(self, state):
+        with torch.no_grad():
+            return (self.forward(cube.get_observation(state)) - 0.358) / (0.374 - 0.358)
 
 
 class SimpleValue:
